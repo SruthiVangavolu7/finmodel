@@ -377,31 +377,51 @@ def render_simulator(predictions: pd.DataFrame) -> None:
 
     action = st.radio("Your decision", ["Buy", "Sell", "Stay Flat"], horizontal=True)
 
-    forward_ret = float(row["forward_return"])
-    actual_up = int(row["label"]) == 1
+    # Outcome must be explicitly revealed per scenario/action selection.
+    current_key = f"{ticker}|{chosen_idx}|{action}"
+    if "show_outcome" not in st.session_state:
+        st.session_state["show_outcome"] = False
+    if "outcome_key" not in st.session_state:
+        st.session_state["outcome_key"] = ""
+    if st.session_state["outcome_key"] != current_key:
+        st.session_state["show_outcome"] = False
 
-    if action == "Buy":
-        pnl = forward_ret
-    elif action == "Sell":
-        pnl = -forward_ret
-    else:
-        pnl = 0.0
+    b1, b2 = st.columns([1, 1])
+    with b1:
+        if st.button("Outcome"):
+            st.session_state["show_outcome"] = True
+            st.session_state["outcome_key"] = current_key
+    with b2:
+        if st.button("Retry"):
+            st.session_state["show_outcome"] = False
+            st.session_state["outcome_key"] = ""
 
-    actual_text = "Up" if actual_up else "Down"
-    model_pick = model_action(float(row["pred_prob"]))
+    if st.session_state["show_outcome"] and st.session_state["outcome_key"] == current_key:
+        forward_ret = float(row["forward_return"])
+        actual_up = int(row["label"]) == 1
 
-    if action == "Stay Flat":
-        cls = "out-flat"
-        verdict = "You stayed flat, so your P/L is 0 for this scenario."
-    elif pnl > 0:
-        cls = "out-good"
-        verdict = "Good read. Your direction matched the next move."
-    else:
-        cls = "out-bad"
-        verdict = "This trade direction was wrong for the next day."
+        if action == "Buy":
+            pnl = forward_ret
+        elif action == "Sell":
+            pnl = -forward_ret
+        else:
+            pnl = 0.0
 
-    st.markdown(
-        f"""
+        actual_text = "Up" if actual_up else "Down"
+        model_pick = model_action(float(row["pred_prob"]))
+
+        if action == "Stay Flat":
+            cls = "out-flat"
+            verdict = "You stayed flat, so your P/L is 0 for this scenario."
+        elif pnl > 0:
+            cls = "out-good"
+            verdict = "Good read. Your direction matched the next move."
+        else:
+            cls = "out-bad"
+            verdict = "This trade direction was wrong for the next day."
+
+        st.markdown(
+            f"""
 <div class='surface'>
   <span class='section-label'>Outcome</span>
   <p>Next-day move: <b>{actual_text}</b> ({forward_ret:.2%})</p>
@@ -409,8 +429,8 @@ def render_simulator(predictions: pd.DataFrame) -> None:
   <p class='{cls}'>{verdict}</p>
 </div>
         """,
-        unsafe_allow_html=True,
-    )
+            unsafe_allow_html=True,
+        )
 
 
 def main() -> None:
